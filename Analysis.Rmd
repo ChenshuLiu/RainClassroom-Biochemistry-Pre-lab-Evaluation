@@ -1,0 +1,105 @@
+\section{Data Import}
+```{r, message = FALSE}
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+data <- read.csv('~/Documents/Research/Edu/Rain Classroom/merged_df_cleanedMC.csv')
+```
+\section{Gender & Major summary}
+```{r}
+demographics <- data %>% 
+  group_by(Gender, Dept) %>%
+  summarise(dis = n()) %>%
+  print()
+  
+demographics  %>% ggplot(aes(x = Dept, y = dis, fill = Gender)) +
+    geom_bar(stat = "identity") +
+    labs(title = "Respondent Demographics Summary", x = "Department", y = "Count") +
+    theme_minimal() +
+    theme(plot.title = element_text(hjust = 0.5))
+```
+```{r, warning = FALSE}
+library(reshape2)
+MC_summary <- data %>%
+  select(Q1, Q2, Q3, Q4, Q5) %>%
+  lapply(function(x) table(x))
+
+MC_summary_df <- as.data.frame(bind_rows(MC_summary, .id = 'Question'))
+MC_summary_df[is.na(MC_summary_df)] = NA
+MC_summary_df[c('A', 'B', 'C')] <- MC_summary_df[c('A', 'B', 'C')] %>%
+  mutate_all(~round(./85, 3))
+
+MC_summary_df <- data.frame(
+  id = MC_summary_df$Question,
+  lapply(MC_summary_df[-1], function(x) as.numeric(x))
+)
+colnames(MC_summary_df)[1] <- 'Question'
+MC_summary_df_melt <- melt(MC_summary_df, id.vars = c('Question'), measure.vars = c('A', 'B', 'C'))
+colnames(MC_summary_df_melt) <- c('Question', 'Choice', 'Frequency')
+MC_summary_df_melt %>%
+  ggplot(aes(x = Question, y = Frequency, fill = Choice)) +
+  geom_bar(stat = "identity") +
+  labs(title = "Multiple Choice Response", x = "Question", y = "Frequency") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  geom_text(
+    aes(label = Frequency),
+    position = position_stack(vjust = 0.5),
+    color = 'white',
+    size = 3
+  )
+```
+
+```{r}
+# Assuming df is your dataframe with columns Q1, Q2, Q3, Q4, Q5
+# You may need to convert the responses to factors if they are not already
+
+# Convert responses to factors
+ori_df <- data %>%
+  select(Q1, Q2, Q3, Q4, Q5)
+df <- lapply(ori_df, as.factor)
+
+# Create a function to calculate Cramér's V
+cramer_v <- function(x, y) {
+  confusion_matrix <- table(x, y)
+  chi2 <- chisq.test(confusion_matrix)$statistic
+  n <- sum(confusion_matrix)
+  min_dim <- min(dim(confusion_matrix)) - 1
+  sqrt(chi2 / (n * min_dim))
+}
+
+# Calculate Cramér's V for each pair of questions
+cor_matrix <- matrix(0, ncol = 5, nrow = 5)
+for (i in 1:(5 - 1)) {
+  for (j in (i + 1):5) {
+    cor_matrix[i, j] <- cramer_v(df[[i]], df[[j]])
+    cor_matrix[j, i] <- cor_matrix[i, j]
+  }
+}
+
+# Convert to a dataframe for better visualization
+cor_df <- as.data.frame(cor_matrix)
+colnames(cor_df) <- colnames(ori_df)
+
+# Print the correlation matrix
+print(cor_df)
+```
+
+```{r}
+# Convert data to a long format suitable for ggplot2
+library(tidyr)
+library(ggplot2)
+
+data_long <- as.data.frame(as.table(cor_df_mat))
+names(data_long) <- c("Var1", "Var2", "Correlation")
+
+# Create heatmap using ggplot2
+ggplot(data_long, aes(x = Var1, y = Var2, fill = Correlation)) +
+  geom_tile(color = "white") +
+  scale_fill_gradient(low = "gray", high = "blue") +  # You can choose your own color scale
+  theme_minimal() +  # Adjust the theme as needed
+  geom_text(aes(label = round(Correlation, 3)), vjust = 1, color = 'white') +
+  labs(title = "Cramér's V for Q1-Q5") +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
