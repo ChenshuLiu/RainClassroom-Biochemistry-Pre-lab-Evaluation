@@ -3,7 +3,7 @@
 library(ggplot2)
 library(dplyr)
 library(tidyr)
-data <- read.csv('~/Documents/Research/Edu/Rain Classroom/merged_df_cleanedMC.csv')
+data <- read.csv('~/Documents/Research/Edu/Github repo/merged_df_cleanedMC.csv')
 ```
 \section{Gender & Major summary}
 ```{r}
@@ -21,7 +21,7 @@ demographics  %>% ggplot(aes(x = Dept, y = dis, fill = Gender)) +
 ```{r, warning = FALSE}
 library(reshape2)
 MC_summary <- data %>%
-  select(Q1, Q2, Q3, Q4, Q5) %>%
+  select(Q1, Q2, Q3, Q4, Q5, Q6) %>%
   lapply(function(x) table(x))
 
 MC_summary_df <- as.data.frame(bind_rows(MC_summary, .id = 'Question'))
@@ -56,7 +56,7 @@ MC_summary_df_melt %>%
 
 # Convert responses to factors
 ori_df <- data %>%
-  select(Q1, Q2, Q3, Q4, Q5)
+  select(Q1, Q2, Q3, Q4, Q5, Q6)
 df <- lapply(ori_df, as.factor)
 
 # Create a function to calculate Cramér's V
@@ -69,17 +69,20 @@ cramer_v <- function(x, y) {
 }
 
 # Calculate Cramér's V for each pair of questions
-cor_matrix <- matrix(0, ncol = 5, nrow = 5)
-for (i in 1:(5 - 1)) {
-  for (j in (i + 1):5) {
+cor_matrix <- matrix(0, ncol = 6, nrow = 6)
+for (i in 1:(6 - 1)) {
+  for (j in (i + 1):6) {
     cor_matrix[i, j] <- cramer_v(df[[i]], df[[j]])
     cor_matrix[j, i] <- cor_matrix[i, j]
   }
 }
+colnames(cor_matrix) <- colnames(data)[3:8]
+rownames(cor_matrix) <- colnames(data)[3:8]
 
 # Convert to a dataframe for better visualization
 cor_df <- as.data.frame(cor_matrix)
 colnames(cor_df) <- colnames(ori_df)
+cor_df_mat <- as.matrix(cor_df)
 
 # Print the correlation matrix
 print(cor_df)
@@ -99,7 +102,23 @@ ggplot(data_long, aes(x = Var1, y = Var2, fill = Correlation)) +
   scale_fill_gradient(low = "gray", high = "blue") +  # You can choose your own color scale
   theme_minimal() +  # Adjust the theme as needed
   geom_text(aes(label = round(Correlation, 3)), vjust = 1, color = 'white') +
-  labs(title = "Cramér's V for Q1-Q5") +
+  labs(title = "Cramér's V for Q1-Q6") +
   theme(plot.title = element_text(hjust = 0.5))
+```
+
+```{r}
+library(xtable)
+library(dplyr)
+library(tidyr)
+online_combined <- rbind(online1, online2, online3, online4, online5)
+final_combined <- rbind(final1, final2, final3, final4, final5)
+merged_online_final <- merge(online_combined, final_combined) %>%
+  filter(!is.na(Grade))
+dim(merged_online_final)
+View(merged_online_final)
+online_final_lm <- lm(Grade ~ `Online-grade`, data = merged_online_final)
+summary(online_final_lm)
+latex_table <- xtable(online_final_lm)
+print(latex_table)
 ```
 
